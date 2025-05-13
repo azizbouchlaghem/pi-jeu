@@ -1,289 +1,171 @@
-
-// Includes
-#include "menu.h"
-#include "perso.h"
-#include "background.h"
-#include "ennemie.h"
-#include "map.h"
-#include "enigme.h"
-#include "puzzle.h"
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 #include <SDL/SDL_ttf.h>
 #include <SDL/SDL_mixer.h>
-#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
-#include <string.h>
+#include "enigme.h"
+#include "puzzle.h"
 
-int main(int argc, char* argv[]) {
-    // Initialisation SDL
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
-        fprintf(stderr, "Erreur SDL_Init: %s\n", SDL_GetError());
-        return 1;
-    }
-
-    if (TTF_Init() < 0) {
-        fprintf(stderr, "Erreur TTF_Init: %s\n", TTF_GetError());
-        SDL_Quit();
-        return 1;
-    }
-
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        fprintf(stderr, "Erreur Mix_OpenAudio: %s\n", Mix_GetError());
-    }
-
-    SDL_Surface* screen = SDL_SetVideoMode(1530, 1024, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
-    if (!screen) {
-        fprintf(stderr, "Erreur SDL_SetVideoMode: %s\n", SDL_GetError());
-        TTF_Quit();
-        SDL_Quit();
-        return 1;
-    }
-
-    SDL_WM_SetCaption("God's Tear", NULL);
-    srand(time(NULL));
-
-    // Initialisation
-    initMenu();
-    background bgJeu;
-    initBackground(&bgJeu);
-
-    Personne p1, p2;
-    initPerso(&p1);
-    initPerso(&p2);
-    p2.position.x = bgJeu.camera2.x + 100;
-    p2.position.y = 800;
-
-    Ennemi ennemi;
-    initEnnemi(&ennemi, SCREEN_W);
-
-    Minimap minimap;
-    initMinimap(&minimap);
-
-    int mode = 0;
-    Uint32 lastTime = SDL_GetTicks();
+int main() {
+    const int HAUTEUR = 1000;
+    const int LARGEUR = 1800;
+    int done = 1;
+    SDL_Surface *ecran = NULL;
     SDL_Event event;
-    bool running = true;
-    static bool bgMenuFreed = false;
-
-    while (running) {
-        Uint32 currentTime = SDL_GetTicks();
-        Uint32 dt = currentTime - lastTime;
-
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) running = false;
-            if (state != PLAYING_SOLO && state != PLAYING_MULTI)
-                handleEvent(event);
-        }
-
-        if (!bgMenuFreed && (state == PLAYING_SOLO || state == PLAYING_MULTI)) {
-            libererBackgroundMenu();
-            bgMenuFreed = true;
-        }
-
-        if (state == PLAYING_SOLO || state == PLAYING_MULTI) {
-            mode = (state == PLAYING_SOLO) ? 0 : 1;
-
-            SDL_PumpEvents();
-            const Uint8* keys = SDL_GetKeyState(NULL);
-            int moving1 = 0, moving2 = 0;
-
-            if (keys[SDLK_ESCAPE]) state = MENU_PRINCIPAL;
-
-            if (keys[SDLK_SPACE] && !p1.en_saut) {
-                p1.en_saut = 1;
-                p1.v_y = p1.v_saut;
-            }
-            if (keys[SDLK_z] && !p2.en_saut) {
-                p2.en_saut = 1;
-                p2.v_y = p2.v_saut;
-            }
-
-            if (keys[SDLK_RIGHT]) {
-                p1.direction = 1;
-                movePerso(&p1, dt);
-                moving1 = 1;
-            } else if (keys[SDLK_LEFT]) {
-                p1.direction = 0;
-                movePerso(&p1, dt);
-                moving1 = 1;
-            }
-
-            if (mode == 1) {
-                if (keys[SDLK_d]) {
-                    p2.direction = 1;
-                    movePerso(&p2, dt);
-                    moving2 = 1;
-                } else if (keys[SDLK_q]) {
-                    p2.direction = 0;
-                    movePerso(&p2, dt);
-                    moving2 = 1;
-                }
-            }
-
-            if (moving1) animerPerso(&p1);
-            if (mode == 1 && moving2) animerPerso(&p2);
-
-            moveEnnemi(&ennemi, SCREEN_W);
-            if (!ennemi.actif) initEnnemi(&ennemi, SCREEN_W);
-
-            if (ennemi.actif && collisionAvecEnnemi(p1.position, ennemi.pos)) {
-                if (p1.vie > 0) p1.vie--;
-                ennemi.actif = 0;
-                SDL_Delay(200);
-            }
-
-            if (mode == 1 && ennemi.actif && collisionAvecEnnemi(p2.position, ennemi.pos)) {
-                if (p2.vie > 0) p2.vie--;
-                ennemi.actif = 0;
-                SDL_Delay(200);
-            }
-
-            if (p1.vie <= 0 || (mode == 1 && p2.vie <= 0)) {
-                
-// Load enigmes
-Enigme enigme = chargerEnigmes("enigmes.txt");
-TTF_Font* font = TTF_OpenFont("arial.ttf", 24);
-SDL_Color textColor = {255, 255, 255};
-
-if (font && enigme.nombreQuestions > 0) {
+    TTF_Font *font = NULL;
+    SDL_Color textColor = {255, 255, 255};
+    Enigme enigme;
+    int rep = -1;
+    
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        fprintf(stderr, "Erreur d'initialisation de la SDL : %s\n", SDL_GetError());
+        return EXIT_FAILURE;
+    }
+    
+    if (IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG) == 0) {
+        fprintf(stderr, "Erreur d'initialisation de SDL_image : %s\n", IMG_GetError());
+        SDL_Quit();
+        return EXIT_FAILURE;
+    }
+    
+    if (TTF_Init() != 0) {
+        fprintf(stderr, "Erreur d'initialisation de TTF : %s\n", TTF_GetError());
+        IMG_Quit();
+        SDL_Quit();
+        return EXIT_FAILURE;
+    }
+    
+    ecran = SDL_SetVideoMode(LARGEUR, HAUTEUR, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
+    if (ecran == NULL) {
+        fprintf(stderr, "Erreur d'initialisation de la fenêtre : %s\n", SDL_GetError());
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return EXIT_FAILURE;
+    }
+    
+    SDL_WM_SetCaption("Enigme", NULL);
+    
+    font = TTF_OpenFont("arial.ttf", 24);
+    if (font == NULL) {
+        fprintf(stderr, "Erreur de chargement de la police : %s\n", TTF_GetError());
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return EXIT_FAILURE;
+    }
+    
+    enigme = chargerEnigmes("enigmes.txt");
+    if (enigme.nombreQuestions == 0) {
+        fprintf(stderr, "Aucune énigme n'a été chargée!\n");
+        TTF_CloseFont(font);
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return EXIT_FAILURE;
+    }
+    
     initialiserMenu(&enigme, font, textColor);
-    enigme.inMenu = 1;
-
-    bool choiceMade = false;
-    bool choseEnigme = false;
-
-    while (!choiceMade && running) {
+    enigme.inPuzzleGame = 0;
+    
+    while (done) {
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) running = false;
-            else if (event.type == SDL_MOUSEMOTION) 
-                verifierHoverMenu(&enigme, event.motion.x, event.motion.y);
-            else if (event.type == SDL_MOUSEBUTTONDOWN) {
-                int choice = verifierClicMenu(&enigme, event.button.x, event.button.y);
-                if (choice == 1) { choiceMade = true; choseEnigme = true; }
-                else if (choice == 2) { choiceMade = true; choseEnigme = false; }
-            }
-        }
-        afficherMenu(screen, &enigme);
-        SDL_Flip(screen);
-    }
-
-    if (choiceMade && choseEnigme) {
-        genererEnigmeAleatoire(&enigme);
-        initialiserSurfaces(&enigme, font, textColor);
-
-        bool done = false;
-        while (!done && running) {
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) running = false;
-                else if (event.type == SDL_MOUSEBUTTONDOWN) {
-                    int reponse = verifierClicReponse(&enigme, event.button.x, event.button.y);
-                    if (reponse > 0) {
-                        afficherEnigme(screen, &enigme, font, textColor);
-                        SDL_Flip(screen);
-                        SDL_Delay(1500);
-
-                        if (enigme.indexActuel >= enigme.nombreQuestions) {
-		    done = true; // All questions have been answered
-		} else {
-		    genererEnigmeAleatoire(&enigme);
-		    initialiserSurfaces(&enigme, font, textColor);
-		}
-                    }
+            if (enigme.inPuzzleGame) {
+                switch (event.type) {
+                    case SDL_QUIT:
+                        done = 0;
+                        break;
+                    default:
+                        updatePuzzle(event, &enigme.puzzleGame, ecran);
+                        break;
+                }
+            } else {
+                switch (event.type) {
+                    case SDL_QUIT:
+                        done = 0;
+                        break;
+                    case SDL_MOUSEMOTION:
+                        if (enigme.inMenu) {
+                            verifierHoverMenu(&enigme, event.motion.x, event.motion.y);
+                        }
+                        break;
+                    case SDL_MOUSEBUTTONDOWN:
+                        if (event.button.button == SDL_BUTTON_LEFT) {
+                            if (enigme.inMenu) {
+                                int menuChoice = verifierClicMenu(&enigme, event.button.x, event.button.y);
+                                if (menuChoice == 1) {
+                                    genererEnigmeAleatoire(&enigme);
+                                    initialiserSurfaces(&enigme, font, textColor);
+                                } else if (menuChoice == 2) {
+                                    enigme.inPuzzleGame = 1;
+                                    initialiserPuzzle(&enigme.puzzleGame, ecran);
+                                }
+                            } else {
+                                rep = verifierClicReponse(&enigme, event.button.x, event.button.y);
+                                if (rep > 0) {
+                                    printf("Vous avez cliqué sur la réponse %d\n", rep);
+                                    gererReponse(&enigme, ecran, font, textColor, &done);
+                                }
+                            }
+                        }
+                        break;
+                    case SDL_KEYDOWN:
+                        if (!enigme.inMenu) {
+                            if (event.key.keysym.sym == SDLK_a) {
+                                rep = verifierClicReponse(&enigme, enigme.reponsePos[0].x + 10, enigme.reponsePos[0].y + 10);
+                                if (rep > 0) {
+                                    printf("Vous avez sélectionné la réponse A (1)\n");
+                                    gererReponse(&enigme, ecran, font, textColor, &done);
+                                }
+                            }
+                            else if (event.key.keysym.sym == SDLK_b) {
+                                rep = verifierClicReponse(&enigme, enigme.reponsePos[1].x + 10, enigme.reponsePos[1].y + 10);
+                                if (rep > 0) {
+                                    printf("Vous avez sélectionné la réponse B (2)\n");
+                                    gererReponse(&enigme, ecran, font, textColor, &done);
+                                }
+                            }
+                            else if (event.key.keysym.sym == SDLK_c) {
+                                rep = verifierClicReponse(&enigme, enigme.reponsePos[2].x + 10, enigme.reponsePos[2].y + 10);
+                                if (rep > 0) {
+                                    printf("Vous avez sélectionné la réponse C (3)\n");
+                                    gererReponse(&enigme, ecran, font, textColor, &done);
+                                }
+                            }
+                        }
+                        break;
                 }
             }
-            afficherEnigme(screen, &enigme, font, textColor);
-            animerEn(&enigme);
-            afficherEn(&enigme, screen);
-            SDL_Flip(screen);
         }
-
-        if (enigme.score >= 5) {
-            p1.vie = 3;
-            if (mode == 1) p2.vie = 3;
-            SDL_Surface* successMsg = TTF_RenderText_Blended(font, "Success! Health restored.", (SDL_Color){0, 255, 0});
-            SDL_BlitSurface(successMsg, NULL, screen, NULL);
-            SDL_Flip(screen);
-            SDL_Delay(2000);
-            SDL_FreeSurface(successMsg);
-        } else {
-            SDL_Surface* failMsg = TTF_RenderText_Blended(font, "Failed! Returning to menu.", (SDL_Color){255, 0, 0});
-            SDL_BlitSurface(failMsg, NULL, screen, NULL);
-            SDL_Flip(screen);
-            SDL_Delay(2000);
-            SDL_FreeSurface(failMsg);
-            state = MENU_PRINCIPAL;
-        }
-    } 
-    else if (choiceMade && !choseEnigme) {
-        Puzzle puzzle;
-        initialiserPuzzle(&puzzle, screen);
-
-        while (!puzzle.bravo && !puzzle.timeUp && running) {
-            afficherPuzzle(&puzzle, screen);
-            SDL_Flip(screen);
-
-            while (SDL_PollEvent(&event)) {
-                updatePuzzle(event, &puzzle, screen);
-                if (event.type == SDL_QUIT) running = false;
+        
+        if (enigme.inPuzzleGame) {
+            afficherPuzzle(&enigme.puzzleGame, ecran);
+            if ((enigme.puzzleGame.bravo || enigme.puzzleGame.timeUp) && enigme.puzzleGame.showMessage) {
+                SDL_Delay(2000);
+                enigme.inPuzzleGame = 0;
+                enigme.inMenu = 1;
             }
+        } 
+        else if (enigme.inMenu) {
+            afficherMenu(ecran, &enigme);
+        } 
+        else {
+            afficherEnigme(ecran, &enigme, font, textColor);
+            animerEnnemi(&enigme);
+            afficherEnnemi(&enigme, ecran);
         }
-
-        if (puzzle.bravo) {
-            p1.vie = 3;
-            if (mode == 1) p2.vie = 3;
-        } else {
-            state = MENU_PRINCIPAL;
-        }
-
-        cleanUpPuzzle(&puzzle);
+        
+        SDL_Flip(ecran);
     }
-
-    TTF_CloseFont(font);
+    
     libererEnigme(&enigme);
-    continue;
-}
-
-                continue;
-            }
-
-            // Rendering
-            if (mode == 0) {
-                afficheBackground(bgJeu, screen, 0);
-                afficherEnnemi(ennemi, screen);
-                SDL_Rect pos1 = {p1.position.x - bgJeu.cameraFullScreen.x, p1.position.y};
-                afficherPersoAvecPos(p1, screen, pos1);
-                afficherVie(p1, screen);
-                updateMinimap(&minimap, bgJeu.cameraFullScreen, p1.position, p2.position);
-                afficherMinimap(&minimap, screen);
-            } else {
-                afficheBackground(bgJeu, screen, 1);
-                afficheBackground(bgJeu, screen, 2);
-                afficherEnnemi(ennemi, screen);
-                SDL_Rect pos1 = {p1.position.x - bgJeu.camera1.x + bgJeu.posEcran1.x, p1.position.y};
-                SDL_Rect pos2 = {p2.position.x - bgJeu.camera2.x + bgJeu.posEcran2.x, p2.position.y};
-                afficherPersoAvecPos(p1, screen, pos1);
-                afficherPersoAvecPos(p2, screen, pos2);
-                afficherVie(p1, screen);
-                afficherVie(p2, screen);
-                updateMinimap(&minimap, bgJeu.camera1, p1.position, p2.position);
-                afficherMinimap(&minimap, screen);
-            }
-
-            SDL_Flip(screen);
-            sautdroit(&p1);
-            sautdroit(&p2);
-        } else {
-            updateScreen();
-        }
-
-        lastTime = currentTime;
-        SDL_Delay(16);
-    }
-
-    cleanupMenu();
-    Mix_CloseAudio();
+    cleanUpPuzzle(&enigme.puzzleGame);
+    TTF_CloseFont(font);
     TTF_Quit();
+    IMG_Quit();
     SDL_Quit();
-    return 0;
+    
+    return EXIT_SUCCESS;
 }

@@ -1,7 +1,6 @@
 #include "puzzle.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 const char *pieceFiles[NUM_PIECES] = {
     "correct.jpg",
@@ -32,21 +31,21 @@ void initialiserPuzzle(Puzzle *p, SDL_Surface *ecran) {
     // Load images with error handling
     p->imageOriginale = IMG_Load("original.jpg");
     if (!p->imageOriginale) {
-        fprintf(stderr, "Failed to load original.jpg: %s\n", IMG_GetError());
-        p->imageOriginale = createPlaceholder(ecran, 300, 300, 0xFF00FF);
+        printf("Failed to load original.jpg: %s\n", IMG_GetError());
+        p->imageOriginale = createPlaceholder(ecran, 300, 300, 0xFF00FF); // Purple placeholder
     }
 
     for (int i = 0; i < NUM_PIECES; i++) {
         p->pieces[i] = IMG_Load(pieceFiles[i]);
         if (!p->pieces[i]) {
-            fprintf(stderr, "Failed to load %s: %s\n", pieceFiles[i], IMG_GetError());
+            printf("Failed to load %s: %s\n", pieceFiles[i], IMG_GetError());
             p->pieces[i] = createPlaceholder(ecran, 100, 100, 0xFF0000 + (i * 0x00AA00));
         }
     }
 
     p->suivant = IMG_Load("suivant.jpg");
     if (!p->suivant) {
-        fprintf(stderr, "Failed to load suivant.jpg: %s\n", IMG_GetError());
+        printf("Failed to load suivant.jpg: %s\n", IMG_GetError());
         p->suivant = createPlaceholder(ecran, 100, 50, 0xFFFF00);
     }
 
@@ -119,14 +118,14 @@ void verifierPlacement(Puzzle *p) {
         p->bravo = true;
         TTF_Font *font = TTF_OpenFont("arial.ttf", 36);
         if (!font) {
-            fprintf(stderr, "Failed to load font: %s\n", TTF_GetError());
+            printf("Failed to load font: %s\n", TTF_GetError());
             return;
         }
         SDL_Color green = {0, 255, 0};
         p->message = TTF_RenderText_Solid(font, "Piece correcte!", green);
         TTF_CloseFont(font);
         if (!p->message) {
-            fprintf(stderr, "Failed to render text: %s\n", TTF_GetError());
+            printf("Failed to render text: %s\n", TTF_GetError());
         }
     }
     p->showMessage = true;

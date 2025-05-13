@@ -452,7 +452,7 @@ void gererReponse(Enigme *enigme, SDL_Surface *ecran, TTF_Font *font, SDL_Color 
     }
 }
 
-void animerEn(Enigme *e) {
+void animerEnnemi(Enigme *e) {
 
  Uint32 currentTime = SDL_GetTicks();
  if (currentTime - e->lastFrameTime > 200) 
@@ -469,7 +469,7 @@ void animerEn(Enigme *e) {
     }
 }
 
-void afficherEn(Enigme *e, SDL_Surface *screen) {
+void afficherEnnemi(Enigme *e, SDL_Surface *screen) {
 
    
       

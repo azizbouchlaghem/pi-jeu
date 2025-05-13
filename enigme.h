@@ -70,12 +70,8 @@ int verifierClicReponse(Enigme *enigme, int x, int y);
 void gererReponse(Enigme *enigme, SDL_Surface *ecran, TTF_Font *font, SDL_Color textColor, int *done);
 void libererEnigme(Enigme *enigme);
 void afficherQuestionNumero(SDL_Surface *ecran, Enigme *enigme, TTF_Font *font, SDL_Color textColor);
-void animerEn(Enigme *e);
-void afficherEn(Enigme* e, SDL_Surface *screen);
-
-
-
-
+void animerEnnemi(Enigme *e);
+void afficherEnnemi(Enigme* e, SDL_Surface *screen);
 void initialiserMenu(Enigme *enigme, TTF_Font *font, SDL_Color textColor);
 void afficherMenu(SDL_Surface *ecran, Enigme *enigme);
 int verifierClicMenu(Enigme *enigme, int x, int y);
